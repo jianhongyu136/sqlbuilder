@@ -1,9 +1,6 @@
 package com.cyitce.sqlbuilder;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author jianhongyu
@@ -41,25 +38,6 @@ public class SqlBuilder {
         return new SelectSql(columns);
     }
 
-    /**
-     * from
-     *
-     * @param tables 表
-     * @return SqlBuilder
-     */
-    private SqlBuilder from(String... tables) {
-        sql.append(" from ").append(concat(",", tables)).append(SP);
-        return this;
-    }
-
-    /**
-     * where
-     *
-     * @return WhereSql
-     */
-    public WhereSql where() {
-        return new WhereSql();
-    }
 
     /**
      * append
@@ -151,10 +129,46 @@ public class SqlBuilder {
     }
 
     /**
+     * update语句
+     *
+     * @param table 表
+     * @return UpdateSql
+     */
+    public UpdateSql update(String table) {
+        return new UpdateSql(table);
+    }
+
+    /**
+     * delete语句
+     *
+     * @param table 表
+     * @return SqlBuilder
+     */
+    public DeleteSql delete(String table) {
+        return new DeleteSql(table);
+    }
+
+    /**
+     * insert语句
+     *
+     * @param table 表
+     * @return InsertSql
+     */
+    public InsertSql insert(String table) {
+        return new InsertSql(table);
+    }
+
+    /**
      * select 语句
      */
     public class SelectSql {
+
+        private boolean flag = false;
+
         public SelectSql(String... columns) {
+            if (columns.length > 0) {
+                flag = true;
+            }
             sql.append("select ").append(concat(",", columns));
         }
 
@@ -164,8 +178,18 @@ public class SqlBuilder {
          * @param tables 表
          * @return SqlBuilder
          */
-        public SqlBuilder from(String... tables) {
-            return SqlBuilder.this.from(tables);
+        public SelectSql from(String... tables) {
+            sql.append(" from ").append(concat(",", tables)).append(SP);
+            return this;
+        }
+
+        /**
+         * where
+         *
+         * @return WhereSql
+         */
+        public WhereSql where() {
+            return new WhereSql();
         }
 
         /**
@@ -186,16 +210,21 @@ public class SqlBuilder {
          * @return SelectSql
          */
         public SelectSql sub(SqlBuilder subSelect, boolean bracket) {
-            sql.append(bracket ? " (" : "").append(subSelect.sql()).append(bracket ? ") " : "");
+            if (flag) {
+                sql.append(", ");
+            }
+            sql.append(bracket ? "(" : "").append(subSelect.sql()).append(bracket ? ") " : "");
             params.addAll(subSelect.params());
+            flag = true;
             return this;
         }
 
         /**
          * select语句结束
+         *
          * @return SqlBuilder
          */
-        public SqlBuilder end(){
+        public SqlBuilder end() {
             return SqlBuilder.this;
         }
     }
@@ -407,4 +436,147 @@ public class SqlBuilder {
             return SqlBuilder.this;
         }
     }
+
+    /**
+     * update语句
+     */
+    public class UpdateSql {
+
+        private boolean flag = false;
+
+        public UpdateSql(String table) {
+            sql.append("update ").append(table).append(SP);
+        }
+
+        /**
+         * set
+         *
+         * @param key   键
+         * @param value 值
+         * @return UpdateSql
+         */
+        public UpdateSql set(String key, Object value) {
+            if (flag) {
+                sql.append(", ");
+            } else {
+                sql.append(" set ");
+            }
+            sql.append(SP).append(key).append("=? ");
+            params.add(value);
+            flag = true;
+            return this;
+        }
+
+
+        /**
+         * set
+         *
+         * @param kv 集合
+         * @return UpdateSql
+         */
+        public UpdateSql set(Map<String, Object> kv) {
+            if (kv.size() == 0) {
+                return this;
+            }
+            String[] keys = kv.keySet().toArray(new String[0]);
+            for (String key : keys) {
+                set(key, kv.get(key));
+            }
+            return this;
+        }
+
+        /**
+         * where
+         *
+         * @return WhereSql
+         */
+        public WhereSql where() {
+            return new WhereSql();
+        }
+
+        /**
+         * update语句结束
+         *
+         * @return SqlBuilder
+         */
+        public SqlBuilder end() {
+            return SqlBuilder.this;
+        }
+    }
+
+    /**
+     * delete语句
+     */
+    public class DeleteSql {
+
+        public DeleteSql(String table) {
+            sql.append("delete from ").append(table).append(SP);
+        }
+
+        public WhereSql where() {
+            return new WhereSql();
+        }
+    }
+
+    /**
+     * insert语句
+     */
+    public class InsertSql {
+        private final Map<String, Object> map;
+
+        public InsertSql(String table) {
+            map = new HashMap<>();
+            sql.append("insert into ").append(table);
+        }
+
+        /**
+         * add
+         *
+         * @param key   键
+         * @param value 值
+         * @return InsertSql
+         */
+        public InsertSql add(String key, Object value) {
+            map.put(key, value);
+            return this;
+        }
+
+        /**
+         * add
+         *
+         * @param kv 集合
+         * @return InsertSql
+         */
+        public InsertSql add(Map<String, Object> kv) {
+            map.putAll(kv);
+            return this;
+        }
+
+        /**
+         * insert语句结束
+         *
+         * @return SqlBuilder
+         */
+        public SqlBuilder end() {
+            String[] keys = map.keySet().toArray(new String[0]);
+            sql.append("(");
+            for (int i = 0; i < keys.length; i++) {
+                sql.append(keys[i]);
+                if (i < keys.length - 1) {
+                    sql.append(",");
+                }
+                params.add(map.get(keys[i]));
+            }
+            sql.append(") values(");
+            for (int i = 0; i < keys.length; i++) {
+                sql.append("?");
+                if (i < keys.length - 1) {
+                    sql.append(",");
+                }
+            }
+            sql.append(")");
+            return SqlBuilder.this;
+        }
+    }
+
 }
