@@ -34,8 +34,8 @@ public class SqlBuilder {
     /**
      * select
      *
-     * @param columns
-     * @return
+     * @param columns 字段
+     * @return SelectSql
      */
     public SelectSql select(String... columns) {
         return new SelectSql(columns);
@@ -44,8 +44,8 @@ public class SqlBuilder {
     /**
      * from
      *
-     * @param tables
-     * @return
+     * @param tables 表
+     * @return SqlBuilder
      */
     private SqlBuilder from(String... tables) {
         sql.append(" from ").append(concat(",", tables)).append(SP);
@@ -54,7 +54,8 @@ public class SqlBuilder {
 
     /**
      * where
-     * @return
+     *
+     * @return WhereSql
      */
     public WhereSql where() {
         return new WhereSql();
@@ -62,13 +63,26 @@ public class SqlBuilder {
 
     /**
      * append
-     * @param sql
-     * @param params
-     * @return
+     *
+     * @param sql    sql语句
+     * @param params 参数
+     * @return SqlBuilder
      */
     public SqlBuilder append(CharSequence sql, Object... params) {
         this.sql.append(SP).append(sql).append(SP);
         this.params.addAll(Arrays.asList(params));
+        return this;
+    }
+
+    /**
+     * append
+     *
+     * @param sqlBuilder SqlBuilder
+     * @return SqlBuilder
+     */
+    public SqlBuilder append(SqlBuilder sqlBuilder) {
+        this.sql.append(sqlBuilder.sql());
+        this.params.addAll(sqlBuilder.params());
         return this;
     }
 
@@ -79,7 +93,8 @@ public class SqlBuilder {
 
     /**
      * 生成sql
-     * @return
+     *
+     * @return sql语句
      */
     public String sql() {
         return sql.toString().trim().replaceAll("\\s+", " ");
@@ -87,7 +102,8 @@ public class SqlBuilder {
 
     /**
      * 获取参数
-     * @return
+     *
+     * @return 参数列表
      */
     public List<Object> params() {
         return params;
@@ -96,9 +112,9 @@ public class SqlBuilder {
     /**
      * 字符拼接
      *
-     * @param s
-     * @param strings
-     * @return
+     * @param s       用于拼接的字符
+     * @param strings 字符列表
+     * @return 拼接后的字符串
      */
     private String concat(String s, String... strings) {
         StringBuilder sb = new StringBuilder();
@@ -113,6 +129,17 @@ public class SqlBuilder {
     }
 
     /**
+     * 给表一个别名
+     *
+     * @param name 别名
+     * @return SqlBuilder
+     */
+    public SqlBuilder as(String name) {
+        sql.insert(0, "((").append(") as ").append(name).append(")");
+        return this;
+    }
+
+    /**
      * select 语句
      */
     public class SelectSql {
@@ -120,6 +147,12 @@ public class SqlBuilder {
             sql.append("select ").append(concat(",", columns));
         }
 
+        /**
+         * from
+         *
+         * @param tables 表
+         * @return SqlBuilder
+         */
         public SqlBuilder from(String... tables) {
             return SqlBuilder.this.from(tables);
         }
@@ -130,39 +163,85 @@ public class SqlBuilder {
      */
     public class WhereSql {
 
+        private boolean flag = false;
+
         public WhereSql() {
             sql.append(" where ");
         }
 
+        /**
+         * and
+         *
+         * @return WhereSql
+         */
         public WhereSql and() {
-            sql.append(AND);
+            if (flag) {
+                sql.append(AND);
+            }
             return this;
         }
 
+        /**
+         * or
+         *
+         * @return WhereSql
+         */
         public WhereSql or() {
-            sql.append(OR);
+            if (flag) {
+                sql.append(OR);
+            }
             return this;
         }
 
+        /**
+         * 比较
+         *
+         * @param key   键
+         * @param value 值
+         * @return WhereSql
+         */
         public WhereSql eq(String key, Object value) {
             return eq(key, value, "=");
         }
 
+        /**
+         * 比较
+         *
+         * @param key      键
+         * @param value    值
+         * @param operator 操作符
+         * @return WhereSql
+         */
         public WhereSql eq(String key, Object value, String operator) {
             sql.append(key).append(operator).append("? ");
             params.add(value);
+            flag = true;
             return this;
         }
 
+        /**
+         * 比较
+         *
+         * @param kv 集合
+         * @return WhereSql
+         */
         public WhereSql eq(Map<String, Object> kv) {
             return eq(kv, "=", false);
         }
 
+        /**
+         * eq
+         *
+         * @param kv       集合
+         * @param operator 操作符
+         * @param or       是否为or连接
+         * @return WhereSql
+         */
         public WhereSql eq(Map<String, Object> kv, String operator, boolean or) {
             if (kv.size() == 0) {
                 return this;
             }
-            sql.append("(");
+            sql.append(" (");
             String[] keys = kv.keySet().toArray(new String[0]);
             for (int i = 0; i < keys.length; i++) {
                 eq(keys[i], kv.get(keys[i]), operator);
@@ -170,25 +249,46 @@ public class SqlBuilder {
                     sql.append(or ? OR : AND);
                 }
             }
-            sql.append(")");
+            sql.append(") ");
             return this;
         }
 
+        /**
+         * 字符串模糊匹配
+         *
+         * @param key   键
+         * @param value 值
+         * @return WhereSql
+         */
         public WhereSql like(String key, Object value) {
             sql.append(key).append(" like concat('%',?,'%') ");
             params.add(value);
+            flag = true;
             return this;
         }
 
+        /**
+         * 字符串模糊匹配
+         *
+         * @param kv 集合
+         * @return WhereSql
+         */
         public WhereSql like(Map<String, Object> kv) {
             return like(kv, false);
         }
 
+        /**
+         * 字符串模糊匹配
+         *
+         * @param kv 集合
+         * @param or 是否为or拼接
+         * @return WhereSql
+         */
         public WhereSql like(Map<String, Object> kv, boolean or) {
             if (kv.size() == 0) {
                 return this;
             }
-            sql.append("(");
+            sql.append(" (");
             String[] keys = kv.keySet().toArray(new String[0]);
             for (int i = 0; i < keys.length; i++) {
                 like(keys[i], kv.get(keys[i]));
@@ -196,27 +296,49 @@ public class SqlBuilder {
                     sql.append(or ? OR : AND);
                 }
             }
-            sql.append(")");
+            sql.append(") ");
             return this;
         }
 
 
+        /**
+         * 区间
+         *
+         * @param key    键
+         * @param value1 区间1
+         * @param value2 区间2
+         * @return WhereSql
+         */
         public WhereSql between(String key, Object value1, Object value2) {
             sql.append(key).append(" between ? and ? ");
             params.add(value1);
             params.add(value2);
+            flag = true;
             return this;
         }
 
+        /**
+         * 区间
+         *
+         * @param kv String,Object[2]
+         * @return WhereSql
+         */
         public WhereSql between(Map<String, Object> kv) {
             return between(kv, false);
         }
 
+        /**
+         * 区间
+         *
+         * @param kv String,Object[2]
+         * @param or 是否为or拼接
+         * @return WhereSql
+         */
         public WhereSql between(Map<String, Object> kv, boolean or) {
             if (kv.size() == 0) {
                 return this;
             }
-            sql.append("(");
+            sql.append(" (");
             String[] keys = kv.keySet().toArray(new String[0]);
             for (int i = 0; i < keys.length; i++) {
                 Object v = kv.get(keys[i]);
@@ -230,11 +352,15 @@ public class SqlBuilder {
                     }
                 }
             }
-            sql.append(")");
+            sql.append(") ");
             return this;
         }
 
-
+        /**
+         * where语句结束
+         *
+         * @return
+         */
         public SqlBuilder end() {
             return SqlBuilder.this;
         }

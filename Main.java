@@ -18,10 +18,10 @@ public class Main {
         map.put("name", Arrays.asList("abc","def"));
         map.put("count",Arrays.asList(123,565));
         SqlBuilder sqlBuilder = new SqlBuilder()
-                .select().from()
                 .select("*").from("user","test")
-                .where().between(map,true).end()
-                .append("order by id");
+                .where().or().between(map,true).end()
+                .append("order by id").as("ttt");
+
         System.out.println(sqlBuilder);
         System.out.println(sqlBuilder.params());
     }
