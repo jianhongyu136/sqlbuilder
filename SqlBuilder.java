@@ -81,7 +81,18 @@ public class SqlBuilder {
      * @return SqlBuilder
      */
     public SqlBuilder append(SqlBuilder sqlBuilder) {
-        this.sql.append(sqlBuilder.sql());
+        return append(sqlBuilder, false);
+    }
+
+    /**
+     * append
+     *
+     * @param sqlBuilder SqlBuilder
+     * @param bracket    是否用括号包裹
+     * @return SqlBuilder
+     */
+    public SqlBuilder append(SqlBuilder sqlBuilder, boolean bracket) {
+        this.sql.append(bracket ? " (" : "").append(sqlBuilder.sql()).append(bracket ? ") " : "");
         this.params.addAll(sqlBuilder.params());
         return this;
     }
@@ -129,13 +140,13 @@ public class SqlBuilder {
     }
 
     /**
-     * 给表一个别名
+     * 别名
      *
      * @param name 别名
      * @return SqlBuilder
      */
     public SqlBuilder as(String name) {
-        sql.insert(0, "((").append(") as ").append(name).append(")");
+        sql.insert(0, "(").append(") as ").append(name);
         return this;
     }
 
@@ -155,6 +166,37 @@ public class SqlBuilder {
          */
         public SqlBuilder from(String... tables) {
             return SqlBuilder.this.from(tables);
+        }
+
+        /**
+         * 子查询
+         *
+         * @param subSelect 子SQL
+         * @return SelectSql
+         */
+        public SelectSql sub(SqlBuilder subSelect) {
+            return sub(subSelect, false);
+        }
+
+        /**
+         * 子查询
+         *
+         * @param subSelect 子SQL
+         * @param bracket   是否用括号包裹
+         * @return SelectSql
+         */
+        public SelectSql sub(SqlBuilder subSelect, boolean bracket) {
+            sql.append(bracket ? " (" : "").append(subSelect.sql()).append(bracket ? ") " : "");
+            params.addAll(subSelect.params());
+            return this;
+        }
+
+        /**
+         * select语句结束
+         * @return SqlBuilder
+         */
+        public SqlBuilder end(){
+            return SqlBuilder.this;
         }
     }
 
@@ -359,7 +401,7 @@ public class SqlBuilder {
         /**
          * where语句结束
          *
-         * @return
+         * @return SqlBuilder
          */
         public SqlBuilder end() {
             return SqlBuilder.this;

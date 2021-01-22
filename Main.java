@@ -1,6 +1,5 @@
 package com.cyitce.sqlbuilder;
 
-import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -14,15 +13,16 @@ import java.util.Map;
  */
 public class Main {
     public static void main(String[] args) {
-        Map<String,Object> map = new HashMap<>();
-        map.put("name", Arrays.asList("abc","def"));
-        map.put("count",Arrays.asList(123,565));
+        Map<String, Object> map = new HashMap<>();
+        map.put("name", Arrays.asList("abc", "def"));
+        map.put("count", Arrays.asList(123, 565));
         SqlBuilder sqlBuilder = new SqlBuilder()
-                .select("*").from("user","test")
-                .where().or().between(map,true).end()
+                .select("*").from("user", "test")
+                .where().between(map, true).end()
                 .append("order by id").as("ttt");
-
-        System.out.println(sqlBuilder);
-        System.out.println(sqlBuilder.params());
+        SqlBuilder sql = new SqlBuilder()
+                .select().sub(sqlBuilder).end();
+        System.out.println(sql);
+        System.out.println(sql.params());
     }
 }
