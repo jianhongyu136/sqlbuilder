@@ -70,7 +70,7 @@ public class SqlBuilder {
      * @return SqlBuilder
      */
     public SqlBuilder append(SqlBuilder sqlBuilder, boolean bracket) {
-        this.sql.append(bracket ? " (" : "").append(sqlBuilder.sql()).append(bracket ? ") " : "");
+        this.sql.append(bracket ? " (" : SP).append(sqlBuilder.sql()).append(bracket ? ") " : SP);
         this.params.addAll(sqlBuilder.params());
         return this;
     }
@@ -86,7 +86,7 @@ public class SqlBuilder {
      * @return sql语句
      */
     public String sql() {
-        return sql.toString().trim().replaceAll("\\s+", " ");
+        return sql.toString().trim().replaceAll("\\s+", SP);
     }
 
     /**
