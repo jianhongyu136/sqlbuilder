@@ -27,6 +27,24 @@ public class SqlBuilder {
         this.params = new ArrayList<>();
     }
 
+    public static boolean isBlank(CharSequence var0) {
+        int var1;
+        if (var0 != null && (var1 = var0.length()) != 0) {
+            for (int var2 = 0; var2 < var1; ++var2) {
+                if (!Character.isWhitespace(var0.charAt(var2))) {
+                    return false;
+                }
+            }
+
+            return true;
+        } else {
+            return true;
+        }
+    }
+
+    public static boolean isNotBlank(CharSequence var0) {
+        return !isBlank(var0);
+    }
 
     /**
      * select
@@ -37,7 +55,6 @@ public class SqlBuilder {
     public SelectSql select(String... columns) {
         return new SelectSql(columns);
     }
-
 
     /**
      * append
@@ -272,7 +289,12 @@ public class SqlBuilder {
          * @return WhereSql
          */
         public WhereSql eq(String key, Object value) {
-            return eq(key, value, "=");
+            return eq(key, value, null);
+        }
+
+
+        public WhereSql eq(String key, Object value, String tableName) {
+            return eq(key, value, "=", tableName);
         }
 
         /**
@@ -283,7 +305,13 @@ public class SqlBuilder {
          * @param operator 操作符
          * @return WhereSql
          */
-        public WhereSql eq(String key, Object value, String operator) {
+        public WhereSql eq(String key, Object value, String operator, String tableName) {
+            if (isBlank(operator)) {
+                operator = "=";
+            }
+            if (isNotBlank(tableName)) {
+                sql.append(tableName).append(".");
+            }
             sql.append(key).append(operator).append("? ");
             params.add(value);
             flag = true;
@@ -297,7 +325,26 @@ public class SqlBuilder {
          * @return WhereSql
          */
         public WhereSql eq(Map<String, Object> kv) {
-            return eq(kv, "=", false);
+            return eq(kv, null);
+        }
+
+
+        public WhereSql eq(Map<String, Object> kv, boolean or) {
+            return eq(kv, "=", or, null);
+        }
+
+        public WhereSql eq(Map<String, Object> kv, String operator, String tableName) {
+            return eq(kv, operator, false, tableName);
+        }
+
+        /**
+         * 比较
+         *
+         * @param kv 集合
+         * @return WhereSql
+         */
+        public WhereSql eq(Map<String, Object> kv, String tableName) {
+            return eq(kv, "=", false, tableName);
         }
 
         /**
@@ -308,14 +355,17 @@ public class SqlBuilder {
          * @param or       是否为or连接
          * @return WhereSql
          */
-        public WhereSql eq(Map<String, Object> kv, String operator, boolean or) {
+        public WhereSql eq(Map<String, Object> kv, String operator, boolean or, String tableName) {
             if (kv.size() == 0) {
+                if (flag) {
+                    sql.deleteCharAt(sql.length() - 1).delete(sql.lastIndexOf(SP), sql.length());
+                }
                 return this;
             }
             sql.append(" (");
             String[] keys = kv.keySet().toArray(new String[0]);
             for (int i = 0; i < keys.length; i++) {
-                eq(keys[i], kv.get(keys[i]), operator);
+                eq(keys[i], kv.get(keys[i]), operator, tableName);
                 if (i < keys.length - 1) {
                     sql.append(or ? OR : AND);
                 }
@@ -332,6 +382,13 @@ public class SqlBuilder {
          * @return WhereSql
          */
         public WhereSql like(String key, Object value) {
+            return like(key, value, null);
+        }
+
+        public WhereSql like(String key, Object value, String tableName) {
+            if (isNotBlank(tableName)) {
+                sql.append(tableName).append(".");
+            }
             sql.append(key).append(" like concat('%',?,'%') ");
             params.add(value);
             flag = true;
@@ -345,7 +402,29 @@ public class SqlBuilder {
          * @return WhereSql
          */
         public WhereSql like(Map<String, Object> kv) {
-            return like(kv, false);
+            return like(kv, false, null);
+        }
+
+        /**
+         * 字符串模糊匹配
+         *
+         * @param kv        集合
+         * @param tableName 表名
+         * @return WhereSql
+         */
+        public WhereSql like(Map<String, Object> kv, String tableName) {
+            return like(kv, false, tableName);
+        }
+
+        /**
+         * 字符串模糊匹配
+         *
+         * @param kv 集合
+         * @param or 是否用or连接
+         * @return WhereSql
+         */
+        public WhereSql like(Map<String, Object> kv, boolean or) {
+            return like(kv, or, null);
         }
 
         /**
@@ -355,14 +434,17 @@ public class SqlBuilder {
          * @param or 是否为or拼接
          * @return WhereSql
          */
-        public WhereSql like(Map<String, Object> kv, boolean or) {
+        public WhereSql like(Map<String, Object> kv, boolean or, String tableName) {
             if (kv.size() == 0) {
+                if (flag) {
+                    sql.deleteCharAt(sql.length() - 1).delete(sql.lastIndexOf(SP), sql.length());
+                }
                 return this;
             }
             sql.append(" (");
             String[] keys = kv.keySet().toArray(new String[0]);
             for (int i = 0; i < keys.length; i++) {
-                like(keys[i], kv.get(keys[i]));
+                like(keys[i], kv.get(keys[i]), tableName);
                 if (i < keys.length - 1) {
                     sql.append(or ? OR : AND);
                 }
@@ -380,12 +462,19 @@ public class SqlBuilder {
          * @param value2 区间2
          * @return WhereSql
          */
-        public WhereSql between(String key, Object value1, Object value2) {
+        public WhereSql between(String key, Object value1, Object value2, String tableName) {
+            if (isNotBlank(tableName)) {
+                sql.append(tableName).append(".");
+            }
             sql.append(key).append(" between ? and ? ");
             params.add(value1);
             params.add(value2);
             flag = true;
             return this;
+        }
+
+        public WhereSql between(String key, Object value1, Object value2) {
+            return between(key, value1, value2, null);
         }
 
         /**
@@ -395,7 +484,15 @@ public class SqlBuilder {
          * @return WhereSql
          */
         public WhereSql between(Map<String, Object> kv) {
-            return between(kv, false);
+            return between(kv, false, null);
+        }
+
+        public WhereSql between(Map<String, Object> kv, String tableName) {
+            return between(kv, false, tableName);
+        }
+
+        public WhereSql between(Map<String, Object> kv, boolean or) {
+            return between(kv, or, null);
         }
 
         /**
@@ -405,8 +502,11 @@ public class SqlBuilder {
          * @param or 是否为or拼接
          * @return WhereSql
          */
-        public WhereSql between(Map<String, Object> kv, boolean or) {
+        public WhereSql between(Map<String, Object> kv, boolean or, String tableName) {
             if (kv.size() == 0) {
+                if (flag) {
+                    sql.deleteCharAt(sql.length() - 1).delete(sql.lastIndexOf(SP), sql.length());
+                }
                 return this;
             }
             sql.append(" (");
@@ -416,7 +516,7 @@ public class SqlBuilder {
                 if (v instanceof List) {
                     List vl = ((List) v);
                     if (vl.size() >= 2) {
-                        between(keys[i], vl.get(0), vl.get(1));
+                        between(keys[i], vl.get(0), vl.get(1), tableName);
                         if (i < keys.length - 1) {
                             sql.append(or ? OR : AND);
                         }
@@ -426,6 +526,14 @@ public class SqlBuilder {
             sql.append(") ");
             return this;
         }
+
+
+        public WhereSql append(CharSequence sql, Object... params) {
+            SqlBuilder.this.append(sql, params);
+            flag = true;
+            return this;
+        }
+
 
         /**
          * where语句结束
@@ -502,6 +610,7 @@ public class SqlBuilder {
         public SqlBuilder end() {
             return SqlBuilder.this;
         }
+
     }
 
     /**
