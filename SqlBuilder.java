@@ -46,6 +46,7 @@ public class SqlBuilder {
         return !isBlank(var0);
     }
 
+
     /**
      * select
      *
@@ -55,6 +56,7 @@ public class SqlBuilder {
     public SelectSql select(String... columns) {
         return new SelectSql(columns);
     }
+
 
     /**
      * append
@@ -91,6 +93,7 @@ public class SqlBuilder {
         this.params.addAll(sqlBuilder.params());
         return this;
     }
+
 
     @Override
     public String toString() {
@@ -178,7 +181,7 @@ public class SqlBuilder {
     /**
      * select 语句
      */
-    public class SelectSql {
+    public class SelectSql extends Common<SelectSql> {
 
         private boolean flag = false;
 
@@ -249,7 +252,7 @@ public class SqlBuilder {
     /**
      * where语句
      */
-    public class WhereSql {
+    public class WhereSql extends Common<WhereSql> {
 
         private boolean flag = false;
 
@@ -527,14 +530,6 @@ public class SqlBuilder {
             return this;
         }
 
-
-        public WhereSql append(CharSequence sql, Object... params) {
-            SqlBuilder.this.append(sql, params);
-            flag = true;
-            return this;
-        }
-
-
         /**
          * where语句结束
          *
@@ -548,7 +543,7 @@ public class SqlBuilder {
     /**
      * update语句
      */
-    public class UpdateSql {
+    public class UpdateSql extends Common<UpdateSql> {
 
         private boolean flag = false;
 
@@ -616,7 +611,7 @@ public class SqlBuilder {
     /**
      * delete语句
      */
-    public class DeleteSql {
+    public class DeleteSql extends Common<DeleteSql> {
 
         public DeleteSql(String table) {
             sql.append("delete from ").append(table).append(SP);
@@ -630,7 +625,7 @@ public class SqlBuilder {
     /**
      * insert语句
      */
-    public class InsertSql {
+    public class InsertSql extends Common<InsertSql> {
         private final Map<String, Object> map;
 
         public InsertSql(String table) {
@@ -688,4 +683,62 @@ public class SqlBuilder {
         }
     }
 
+
+    private class Common<T extends Common> {
+
+        /**
+         * append
+         *
+         * @param sql    sql语句
+         * @param params 参数
+         * @return this
+         */
+        public T append(CharSequence sql, Object... params) {
+            SqlBuilder.this.append(sql, params);
+            return (T) this;
+        }
+
+        /**
+         * append
+         *
+         * @param sqlBuilder SqlBuilder
+         * @return this
+         */
+        public T append(SqlBuilder sqlBuilder) {
+            return append(sqlBuilder, false);
+        }
+
+        /**
+         * append
+         *
+         * @param sqlBuilder SqlBuilder
+         * @param bracket    是否用括号包裹
+         * @return this
+         */
+        public T append(SqlBuilder sqlBuilder, boolean bracket) {
+            SqlBuilder.this.append(sqlBuilder, bracket);
+            return (T) this;
+        }
+
+
+        /**
+         * 左括号 (
+         *
+         * @return this
+         */
+        public T lb() {
+            sql.append(" (");
+            return (T) this;
+        }
+
+        /**
+         * 右括号 )
+         *
+         * @return this
+         */
+        public T rb() {
+            sql.append(") ");
+            return (T) this;
+        }
+    }
 }

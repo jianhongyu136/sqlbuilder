@@ -28,7 +28,7 @@ public class Main {
 
         SqlBuilder update = new SqlBuilder()
                 .update("table")
-                .set("name", "jhy")
+                .lb().set("name", "jhy").rb()
                 .set("sex", "男")
                 .where().eq("id", 50).end();
 
