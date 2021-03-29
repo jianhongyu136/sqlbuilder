@@ -46,6 +46,12 @@ public class SqlBuilder {
         return !isBlank(var0);
     }
 
+    private static <T> T[] fill(T[] a, T val) {
+        for (int i = 0, len = a.length; i < len; i++) {
+            a[i] = val;
+        }
+        return a;
+    }
 
     /**
      * select
@@ -57,7 +63,6 @@ public class SqlBuilder {
         return new SelectSql(columns);
     }
 
-
     /**
      * append
      *
@@ -67,7 +72,10 @@ public class SqlBuilder {
      */
     public SqlBuilder append(CharSequence sql, Object... params) {
         this.sql.append(SP).append(sql).append(SP);
-        this.params.addAll(Arrays.asList(params));
+        //校验参数不为空
+        if (params != null) {
+            this.params.addAll(Arrays.asList(params));
+        }
         return this;
     }
 
@@ -93,7 +101,6 @@ public class SqlBuilder {
         this.params.addAll(sqlBuilder.params());
         return this;
     }
-
 
     @Override
     public String toString() {
@@ -125,7 +132,7 @@ public class SqlBuilder {
      * @param strings 字符列表
      * @return 拼接后的字符串
      */
-    private String concat(String s, String... strings) {
+    private String join(String s, String... strings) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < strings.length; i++) {
             sb.append(strings[i]);
@@ -189,7 +196,7 @@ public class SqlBuilder {
             if (columns.length > 0) {
                 flag = true;
             }
-            sql.append("select ").append(concat(",", columns));
+            sql.append("select ").append(join(",", columns));
         }
 
         /**
@@ -199,7 +206,7 @@ public class SqlBuilder {
          * @return SqlBuilder
          */
         public SelectSql from(String... tables) {
-            sql.append(" from ").append(concat(",", tables)).append(SP);
+            sql.append(" from ").append(join(",", tables)).append(SP);
             return this;
         }
 
@@ -254,10 +261,12 @@ public class SqlBuilder {
      */
     public class WhereSql extends Common<WhereSql> {
 
-        private boolean flag = false;
+        private final StringBuilder sql;
+        private final List<Object> params = new ArrayList<>();
+        private int flag = 0;
 
         public WhereSql() {
-            sql.append(" where ");
+            sql = new StringBuilder();
         }
 
         /**
@@ -266,9 +275,71 @@ public class SqlBuilder {
          * @return WhereSql
          */
         public WhereSql and() {
-            if (flag) {
+            if (flag > 0) {
                 sql.append(AND);
             }
+            return this;
+        }
+
+        /**
+         * in
+         *
+         * @param key
+         * @param subSql
+         * @return
+         */
+        public WhereSql in(String key, SqlBuilder subSql) {
+            if (subSql == null || isBlank(subSql.sql)) {
+                back();
+                return this;
+            }
+            sql.append(" (").append(key)
+                    .append(" in (")
+                    .append(subSql.sql())
+                    .append(")) ");
+            this.params.addAll(subSql.params());
+            flag++;
+            return this;
+        }
+
+        /**
+         * in
+         *
+         * @param key
+         * @param sub
+         * @return
+         */
+        public WhereSql in(String key, CharSequence sub) {
+            if (sub == null || isBlank(sub)) {
+                back();
+                return this;
+            }
+            sql.append(" (").append(key)
+                    .append(" in (")
+                    .append(sub)
+                    .append(")) ");
+            flag++;
+            return this;
+        }
+
+        /**
+         * in
+         *
+         * @param key
+         * @param params
+         * @return
+         */
+        public WhereSql in(String key, Object... params) {
+            if (params == null || params.length == 0) {
+                back();
+                return this;
+            }
+            sql.append(" (").append(key)
+                    .append(" in (")
+                    .append(join(",", fill(new String[params.length], "?")))
+                    .append(")) ");
+            this.params.addAll(Arrays.asList(params));
+            flag++;
             return this;
         }
 
@@ -278,7 +349,7 @@ public class SqlBuilder {
          * @return WhereSql
          */
         public WhereSql or() {
-            if (flag) {
+            if (flag > 0) {
                 sql.append(OR);
             }
             return this;
@@ -316,8 +387,8 @@ public class SqlBuilder {
                 sql.append(tableName).append(".");
             }
             sql.append(key).append(operator).append("? ");
-            params.add(value);
-            flag = true;
+            this.params.add(value);
+            flag++;
             return this;
         }
 
@@ -359,10 +430,8 @@ public class SqlBuilder {
          * @return WhereSql
          */
         public WhereSql eq(Map<String, Object> kv, String operator, boolean or, String tableName) {
-            if (kv.size() == 0) {
-                if (flag) {
-                    sql.deleteCharAt(sql.length() - 1).delete(sql.lastIndexOf(SP), sql.length());
-                }
+            if (kv == null || kv.size() == 0) {
+                back();
                 return this;
             }
             sql.append(" (");
@@ -389,12 +458,17 @@ public class SqlBuilder {
         }
 
         public WhereSql like(String key, Object value, String tableName) {
+            //如果value为空则不匹配,并去除and等连词
+            if (value == null) {
+                back();
+                return this;
+            }
             if (isNotBlank(tableName)) {
                 sql.append(tableName).append(".");
             }
             sql.append(key).append(" like concat('%',?,'%') ");
-            params.add(value);
-            flag = true;
+            this.params.add(value);
+            flag++;
             return this;
         }
 
@@ -438,10 +512,8 @@ public class SqlBuilder {
          * @return WhereSql
          */
         public WhereSql like(Map<String, Object> kv, boolean or, String tableName) {
-            if (kv.size() == 0) {
-                if (flag) {
-                    sql.deleteCharAt(sql.length() - 1).delete(sql.lastIndexOf(SP), sql.length());
-                }
+            if (kv == null || kv.size() == 0) {
+                back();
                 return this;
             }
             sql.append(" (");
@@ -466,18 +538,25 @@ public class SqlBuilder {
          * @return WhereSql
          */
         public WhereSql between(String key, Object value1, Object value2, String tableName) {
+            if (isBlank(key)) {
+                return this;
+            }
             if (isNotBlank(tableName)) {
                 sql.append(tableName).append(".");
             }
             sql.append(key).append(" between ? and ? ");
-            params.add(value1);
-            params.add(value2);
-            flag = true;
+            this.params.add(value1);
+            this.params.add(value2);
+            flag++;
             return this;
         }
 
-        public WhereSql between(String key, Object value1, Object value2) {
-            return between(key, value1, value2, null);
+        public WhereSql between(String key, Object... params) {
+            if (params == null || params.length < 2) {
+                back();
+                return this;
+            }
+            return between(key, params[0], params[1], null);
         }
 
         /**
@@ -506,10 +585,8 @@ public class SqlBuilder {
          * @return WhereSql
          */
         public WhereSql between(Map<String, Object> kv, boolean or, String tableName) {
-            if (kv.size() == 0) {
-                if (flag) {
-                    sql.deleteCharAt(sql.length() - 1).delete(sql.lastIndexOf(SP), sql.length());
-                }
+            if (kv == null || kv.size() == 0) {
+                back();
                 return this;
             }
             sql.append(" (");
@@ -518,11 +595,9 @@ public class SqlBuilder {
                 Object v = kv.get(keys[i]);
                 if (v instanceof List) {
                     List vl = ((List) v);
-                    if (vl.size() >= 2) {
-                        between(keys[i], vl.get(0), vl.get(1), tableName);
-                        if (i < keys.length - 1) {
-                            sql.append(or ? OR : AND);
-                        }
+                    between(keys[i], vl.get(0), vl.get(1), tableName);
+                    if (i < keys.length - 1) {
+                        sql.append(or ? OR : AND);
                     }
                 }
             }
@@ -536,7 +611,54 @@ public class SqlBuilder {
          * @return SqlBuilder
          */
         public SqlBuilder end() {
+            String whereSql = sql.toString().trim();
+            if (isNotBlank(whereSql)) {
+                SqlBuilder.this.sql.append(" where ").append(whereSql);
+                SqlBuilder.this.params.addAll(params);
+            }
             return SqlBuilder.this;
+        }
+
+        /**
+         * 返回之前的状态，移除and,or,where
+         */
+        private void back() {
+            if (flag > 0) {
+                sql.deleteCharAt(sql.length() - 1).delete(sql.lastIndexOf(SP), sql.length());
+            }
+        }
+
+        @Override
+        public WhereSql append(SqlBuilder sqlBuilder) {
+            sql.append(sqlBuilder);
+            this.params.addAll(sqlBuilder.params);
+            return this;
+        }
+
+        @Override
+        public WhereSql append(CharSequence sql, Object... params) {
+            this.sql.append(sql);
+            this.params.addAll(Arrays.asList(params));
+            return this;
+        }
+
+        @Override
+        public WhereSql append(SqlBuilder sqlBuilder, boolean bracket) {
+            sql.append(bracket ? "(" : "").append(sqlBuilder).append(bracket ? ")" : "");
+            this.params.addAll(sqlBuilder.params);
+            return this;
+        }
+
+        @Override
+        public WhereSql lb() {
+            sql.append("(");
+            return this;
+        }
+
+        @Override
+        public WhereSql rb() {
+            sql.append(")");
+            return this;
         }
     }
 
@@ -578,7 +700,7 @@ public class SqlBuilder {
          * @return UpdateSql
          */
         public UpdateSql set(Map<String, Object> kv) {
-            if (kv.size() == 0) {
+            if (kv == null || kv.size() == 0) {
                 return this;
             }
             String[] keys = kv.keySet().toArray(new String[0]);
